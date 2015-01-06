@@ -43,27 +43,39 @@
    -->
   
   <build>
-    <sourceDirectory>src/main/scala</sourceDirectory>
+    <sourceDirectory>src/main/</sourceDirectory>
     <plugins>
       <plugin>
         <groupId>net.alchim31.maven</groupId>
         <artifactId>scala-maven-plugin</artifactId>
         <version>3.2.0</version>
         <configuration>
-           <args>
+          <recompileMode>incremental</recompileMode>
+          <args>
              <arg>-Yresolve-term-conflict:package</arg>
            </args>
          </configuration>
-        <executions>
-          <execution>
-            <id>compile</id>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <phase>compile</phase>
-          </execution>
-        </executions>
+         <executions>
+           <execution>
+             <id>scala-compile-first</id>
+             <phase>process-resources</phase>
+             <goals>
+               <goal>compile</goal>
+             </goals>
+           </execution>
+         </executions>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.2</version>
+        <configuration>
+          <!-- put your configurations here -->
+        </configuration>
+      </plugin>
+
+
     </plugins>
   </build>
   
