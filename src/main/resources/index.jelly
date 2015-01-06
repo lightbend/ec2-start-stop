@@ -1,0 +1,10 @@
+<?jelly escape-by-default='true'?>
+<div>
+A simple ComputerListener that launches an EC2 worker before a node is started, and stops the
+worker when the Jenkins node is taken off-line. It is not configurable.
+The EC2 instances for the workers must be in the same region as the Jenkins master.
+The master must have an IAM instance profile that permits describing/starting/stopping instances.
+To specify the EC2 worker name "worker-name", label the node as "ec2:worker-name".
+If no tag prefixed by "ec2:" is found, the Jenkins node
+name is used.
+</div>
