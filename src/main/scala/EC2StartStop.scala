@@ -15,6 +15,7 @@ import hudson.slaves._
  * If no tag prefixed by "ec2:" is found, the Jenkins node
  * name is used.
  */
+// @hudson.Extension // Doesn't work due to https://issues.scala-lang.org/browse/SI-7041
 class EC2StartStopComputerListener extends ComputerListener {
   def ec2NodeNameFor(computer: Computer) =
     computer.getNode.getAssignedLabels.asScala.map(_.toString).filter(_.startsWith("ec2:")).map(_.drop(4)).headOption.getOrElse(computer.getName)
