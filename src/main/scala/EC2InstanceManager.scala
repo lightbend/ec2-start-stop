@@ -10,7 +10,7 @@ import scala.util.control.NonFatal
 import java.util.Date
 
 object EC2InstanceManager {
-  def exponentialBackoff(timeoutMinutes: Int = 8, quantumMillis: Int = 500): Stream[Unit] = {
+  def exponentialBackoff(timeoutMinutes: Int = 8, quantumMillis: Int = 200): Stream[Unit] = {
     val endTimeMillis = new Date().getTime + (timeoutMinutes * 60000L)
     Stream.iterate(2L)(ms => ms * ms) map { ms =>
       Math.min(ms * quantumMillis, endTimeMillis - (new Date()).getTime)
