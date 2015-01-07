@@ -17,8 +17,8 @@ import hudson.slaves._
  */
 // @hudson.Extension // Doesn't work due to https://issues.scala-lang.org/browse/SI-7041
 class EC2StartStopComputerListener extends ComputerListener {
-  def ec2NodeNameFor(computer: Computer) =
-    computer.getNode.getAssignedLabels.asScala.map(_.toString).filter(_.startsWith("ec2:")).map(_.drop(4)).headOption.getOrElse(computer.getName)
+  // worker-to-node ratio must be 1:1 (or we might stop an EC2 worker that's being used by another jenkins node)
+  def ec2NodeNameFor(computer: Computer) = computer.getName
 
   // block until worker comes online
   override def preLaunch(computer: Computer, listener: TaskListener): Unit = {
@@ -30,7 +30,6 @@ class EC2StartStopComputerListener extends ComputerListener {
     listener.getLogger.println(s"[EC2] Started worker ${ec2NodeNameFor(computer)}!")
   }
 
-  // TODO: either go back to 1-to-1 for EC2 worker and jenkins node, or only stop worker if all jenkins nodes that run on it are idle
   override def onOffline(computer: Computer, cause: OfflineCause): Unit =
     if (!EC2InstanceManager.stopByName(ec2NodeNameFor(computer)))
       throw new hudson.AbortException
