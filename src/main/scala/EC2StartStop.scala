@@ -25,13 +25,18 @@ class EC2StartStopComputerListener extends ComputerListener {
     listener.getLogger.println(s"[EC2] Starting worker ${ec2NodeNameFor(computer)}.")
 
     if (!EC2InstanceManager.startByNameBlocking(ec2NodeNameFor(computer))(listener.getLogger.println))
-      throw new hudson.AbortException
+      throw new hudson.AbortException // TODO: refined (e.g., when node is still shutting down, this will fail to re-launch)
 
     listener.getLogger.println(s"[EC2] Started worker ${ec2NodeNameFor(computer)}!")
   }
 
-  override def onOffline(computer: Computer, cause: OfflineCause): Unit =
-    if (!EC2InstanceManager.stopByName(ec2NodeNameFor(computer)))
-      throw new hudson.AbortException
+  override def onOffline(computer: Computer, cause: OfflineCause): Unit = cause match {
+    case _ : OfflineCause.LaunchFailed |        // ignore
+         _ : OfflineCause.ChannelTermination => // ignore
+    case _ if cause.toString == "relaunch" =>   // ignore
+    case _ => // actually stop
+      if (!EC2InstanceManager.stopByName(ec2NodeNameFor(computer)))
+        throw new hudson.AbortException
+  }
 
 }
