@@ -15,7 +15,8 @@ import hudson.slaves._
  * If no tag prefixed by "ec2:" is found, the Jenkins node
  * name is used.
  */
-// @hudson.Extension // Doesn't work due to https://issues.scala-lang.org/browse/SI-7041
+// TODO: schedule a task every 45 min to stop EC2 instances of off-line workers (in case we didn't get the onOffline, or if it failed)
+// TODO @hudson.Extension // Doesn't work due to https://issues.scala-lang.org/browse/SI-7041
 class EC2StartStopComputerListener extends ComputerListener {
   // worker-to-node ratio must be 1:1 (or we might stop an EC2 worker that's being used by another jenkins node)
   def ec2NodeNameFor(computer: Computer) = computer.getName
@@ -31,12 +32,11 @@ class EC2StartStopComputerListener extends ComputerListener {
   }
 
   override def onOffline(computer: Computer, cause: OfflineCause): Unit = cause match {
-    case _ : OfflineCause.LaunchFailed |        // ignore
-         _ : OfflineCause.ChannelTermination => // ignore
-    case _ if cause.toString == "relaunch" =>   // ignore
+    // don't ignore these -- seems to be cause when actual disconnects happen, despite the name
+    // case _ : OfflineCause.LaunchFailed | _ : OfflineCause.ChannelTermination =>
+    case _ if cause.toString == "relaunch" =>   // ignore for testing purposes
     case _ => // actually stop
       if (!EC2InstanceManager.stopByName(ec2NodeNameFor(computer)))
         throw new hudson.AbortException
   }
-
 }
