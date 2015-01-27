@@ -7,21 +7,25 @@ import com.amazonaws.regions._
 
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
-import java.util.Date
 
 object EC2InstanceManager {
-  def exponentialBackoff(timeoutMinutes: Int = 8, quantumMillis: Int = 200): Stream[Unit] = {
-    val endTimeMillis = new Date().getTime + (timeoutMinutes * 60000L)
-    Stream.iterate(2L)(ms => ms * ms) map { ms =>
-      Math.min(ms * quantumMillis, endTimeMillis - (new Date()).getTime)
-    } takeWhile (_ > 0) map { Thread.sleep }
+  def exponentialBackoff(timeoutMinutes: Int = 3, retries: Int = 3): Stream[Unit] = {
+    def currentSeconds = System.nanoTime/1000000000L
+    val endTimeSeconds = currentSeconds + (timeoutMinutes * 60L)
+    // Had some fun and came up with this beautiful series: 1, 3, 9, 25, 68, 186, 506, 1376, 3742, ...
+    def genSeconds = Stream.iterate(1)(i => i + 1).map(i => Math.pow(Math.E, i)).map(_.toLong/16).filter(_ > 0)
+    val myTry =
+      if (retries == 0) Stream.empty
+      else  genSeconds map { s => Math.min(s, endTimeSeconds - currentSeconds) * 1000 } takeWhile (_ > 0) map { Thread.sleep }
+
+    myTry.append(exponentialBackoff(timeoutMinutes, retries - 1))
   }
 
   /** Start named instance, wait for status checks to report it's up and running.
    * 
    * `false` if could not start within specified `timeoutMinutes`
    */
-  def startByNameBlocking(name: String, timeoutMinutes: Int = 8)(logger: String => Unit): Boolean =
+  def startByNameBlocking(name: String, timeoutMinutes: Int = 3, retries: Int = 3)(logger: String => Unit): Boolean =
     try {
       val ids = instanceIdsByName(name)
       start(ids) // idempotent
