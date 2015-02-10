@@ -1,5 +1,9 @@
 package com.typesafe.jenkins
 
+import java.util.logging.Logger
+
+import jenkins.model.Jenkins
+
 import scala.collection.JavaConverters._
 
 import hudson.model._
@@ -36,7 +40,12 @@ class EC2StartStopComputerListener extends ComputerListener {
     // case _ : OfflineCause.LaunchFailed | _ : OfflineCause.ChannelTermination =>
     case _ if cause.toString == "relaunch" =>   // ignore for testing purposes
     case _ => // actually stop
-      if (!EC2InstanceManager.stopByName(ec2NodeNameFor(computer)))
+      val nodeName = ec2NodeNameFor(computer)
+      logger.info(s"Taking $nodeName offline!")
+
+      if (!EC2InstanceManager.stopByName(nodeName))
         throw new hudson.AbortException
   }
+
+  private lazy val logger = Logger.getLogger(classOf[EC2StartStopComputerListener].getName)
 }
