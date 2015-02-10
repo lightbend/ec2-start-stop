@@ -25,7 +25,7 @@ object EC2InstanceManager {
    * 
    * `false` if could not start within specified `timeoutMinutes`
    */
-  def startByNameBlocking(name: String, timeoutMinutes: Int = 3, retries: Int = 3)(logger: String => Unit): Boolean =
+  def startByNameBlocking(name: String, timeoutMinutes: Int = 3, retries: Int = 3)(implicit logger: String => Unit): Boolean =
     try {
       val ids = instanceIdsByName(name)
       start(ids) // idempotent
@@ -44,11 +44,16 @@ object EC2InstanceManager {
    */
   def stopByName(name: String, timeoutMinutes: Int = 15): Boolean =
     try {
-      stop(instanceIdsByName(name)) // idempotent
+      println(s"Stopping $name...")
+      stop(instanceIdsByName(name)) // idempotent :-)
+      println(s"Stopped $name")
       true
-    } catch { case NonFatal(_) => false }
+    } catch { case e@NonFatal(_) =>
+      println(s"Failed to stop $name due to $e")
+      false
+    }
   
-  def instanceIdsByName(name: String): List[String] = instanceByName(name).map(_.getInstanceId).toList
+  def instanceIdsByName(name: String)(implicit logger: String => Unit = println): List[String] = instanceByName(name).map(_.getInstanceId).toList
  
   def statusCheck(instanceIds: List[String]): Seq[InstanceStatusSummary] =
    for (instStatus <- describeInstanceStatus(instanceIds).getInstanceStatuses.asScala)
@@ -65,12 +70,19 @@ object EC2InstanceManager {
     _ec2
   }
 
-  def instanceByName(name: String): Option[Instance] = (for (
-    reservation <- ec2.describeInstances.getReservations.asScala;
-    instance    <- reservation.getInstances.asScala;
-    tag         <- instance.getTags.asScala;
-    if tag.getKey == "Name" && tag.getValue == name) 
-      yield instance).headOption
+  def instanceByName(name: String)(implicit logger: String => Unit = println): Option[Instance] = {
+    val instances =
+      for {
+        reservation <- ec2.describeInstances.getReservations.asScala
+        instance    <- reservation.getInstances.asScala
+        //    if instance.getState.getName != "Terminated"
+        tag <- instance.getTags.asScala
+        if tag.getKey == "Name" && tag.getValue == name
+      } yield instance
+
+    if (instances.nonEmpty && instances.tail.nonEmpty) logger(s"Multiple instances found! $instances")
+    instances.headOption
+  }
 
   def start(instanceIds: List[String]) =
     ec2.startInstances(new StartInstancesRequest(instanceIds.asJava)).getStartingInstances.asScala
