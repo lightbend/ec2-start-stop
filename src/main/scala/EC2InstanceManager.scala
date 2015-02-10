@@ -44,9 +44,14 @@ object EC2InstanceManager {
    */
   def stopByName(name: String, timeoutMinutes: Int = 15): Boolean =
     try {
-      stop(instanceIdsByName(name)) // idempotent
+      println(s"Stopping $name...")
+      stop(instanceIdsByName(name)) // idempotent :-)
+      println(s"Stopped $name")
       true
-    } catch { case NonFatal(_) => false }
+    } catch { case e@NonFatal(_) =>
+      println(s"Failed to stop $name due to $e")
+      false
+    }
   
   def instanceIdsByName(name: String)(implicit logger: String => Unit = println): List[String] = instanceByName(name).map(_.getInstanceId).toList
  
