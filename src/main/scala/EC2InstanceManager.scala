@@ -9,34 +9,42 @@ import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
 object EC2InstanceManager {
-  def exponentialBackoff(timeoutMinutes: Int = 3, retries: Int = 3): Stream[Unit] = {
+  def exponentialBackoff(timeoutMinutes: Int = 3, retries: Int = 3)(oneTry: () => Unit): Stream[Unit] = {
     def currentSeconds = System.nanoTime/1000000000L
     val endTimeSeconds = currentSeconds + (timeoutMinutes * 60L)
     // Had some fun and came up with this beautiful series: 1, 3, 9, 25, 68, 186, 506, 1376, 3742, ...
     def genSeconds = Stream.iterate(1)(i => i + 1).map(i => Math.pow(Math.E, i)).map(_.toLong/16).filter(_ > 0)
     val myTry =
       if (retries == 0) Stream.empty
-      else  genSeconds map { s => Math.min(s, endTimeSeconds - currentSeconds) * 1000 } takeWhile (_ > 0) map { Thread.sleep }
+      else genSeconds map { s => Math.min(s, endTimeSeconds - currentSeconds) * 1000 } takeWhile (_ > 0) map { Thread.sleep }
 
-    myTry.append(exponentialBackoff(timeoutMinutes, retries - 1))
+    Stream(oneTry()).append(myTry.append(exponentialBackoff(timeoutMinutes, retries - 1)(oneTry)))
   }
 
   /** Start named instance, wait for status checks to report it's up and running.
    * 
    * `false` if could not start within specified `timeoutMinutes`
    */
-  def startByNameBlocking(name: String, timeoutMinutes: Int = 3, retries: Int = 3)(implicit logger: String => Unit): Boolean =
-    try {
-      val ids = instanceIdsByName(name)
-      start(ids) // idempotent
+  def startByNameBlocking(name: String, timeoutMinutes: Int = 3, retries: Int = 3)(implicit logger: String => Unit): Boolean = {
+    def doStart() = try {
+      val instances = instanceIdsByName(name)
+      logger(s"[EC2] Starting instance '$name'... Matching instances: ${instances.mkString(",")}")
+      start(instances)
+    } catch { case e@NonFatal(_) =>
+      logger(s"[EC2] Failure while starting instance '$name':\n$e")
+    }
 
-      def done() = {
-        val status = statusCheck(ids)
-        logger(s"[EC2] Waiting... Current status check is $status")
-        status.exists(_.getStatus == "ok")
-      }
-      EC2InstanceManager.exponentialBackoff(timeoutMinutes).map(_ => done()).exists(identity)
-    } catch { case NonFatal(_) => false }
+    def done = try {
+      val status = statusCheck(instanceIdsByName(name))
+      logger(s"[EC2] Waiting... Current status check: ${status.mkString(",")}")
+      status.exists(_.getStatus == "ok")
+    } catch { case e@NonFatal(_) =>
+      logger(s"[EC2] Failure while checking instance state of '$name':\n$e")
+      false
+    }
+
+    exponentialBackoff(timeoutMinutes)(doStart).find(_ => done).nonEmpty
+  }
 
   /** Stop named instance.
    * 
