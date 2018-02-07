@@ -78,7 +78,7 @@ object EC2InstanceManager {
     _ec2
   }
 
-  def instanceByName(name: String)(implicit logger: String => Unit = println): Option[Instance] = {
+  def instanceByName(name: String)(implicit logger: String => Unit = println): Option[Instance] = try {
     val instances =
       for {
         reservation <- ec2.describeInstances.getReservations.asScala
@@ -90,6 +90,10 @@ object EC2InstanceManager {
 
     if (instances.nonEmpty && instances.tail.nonEmpty) logger(s"Multiple instances found! $instances")
     instances.headOption
+  } catch {
+    case _ => 
+      logger(s"Couldn't find EC2 instance for $name")
+      None
   }
 
   def start(instanceIds: List[String]) =
