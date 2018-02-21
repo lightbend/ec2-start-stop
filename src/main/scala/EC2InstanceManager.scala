@@ -53,8 +53,21 @@ object EC2InstanceManager {
   def stopByName(name: String, timeoutMinutes: Int = 15): Boolean =
     try {
       println(s"Stopping $name...")
-      stop(instanceIdsByName(name)) // idempotent :-)
-      println(s"Stopped $name")
+      val instances =
+        try instanceIdsByName(name)
+        catch {
+          case e@NonFatal(_) =>
+            println(s"Could not retrieve running instances for $name: $e")
+            Nil
+        } // could simply be that there are no running instances...
+
+      if (instances.nonEmpty) {
+        stop(instances)
+        println(s"Stopped $name")
+      } else {
+        println(s"No running instances found for $name")
+      }
+
       true
     } catch { case e@NonFatal(_) =>
       println(s"Failed to stop $name due to $e")

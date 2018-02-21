@@ -44,7 +44,7 @@ class EC2StartStopComputerListener extends ComputerListener {
       logger.info(s"Taking $nodeName offline!")
 
       if (!EC2InstanceManager.stopByName(nodeName))
-        throw new hudson.AbortException
+        logger.warning(s"Could not take $nodeName offline!")
   }
 
   private lazy val logger = Logger.getLogger(classOf[EC2StartStopComputerListener].getName)
